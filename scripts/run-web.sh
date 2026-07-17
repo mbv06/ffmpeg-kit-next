@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# ENABLE COMMON FUNCTIONS
+source "${BASEDIR}"/scripts/function-"${FFMPEG_KIT_BUILD_TYPE}".sh || return 1
+
+LIB_NAME=$1
+ENABLED_LIBRARY_PATH="${LIB_INSTALL_BASE}/${LIB_NAME}"
+
+# DELETE THE PREVIOUS BUILD OF THE LIBRARY
+if [ -d "${ENABLED_LIBRARY_PATH}" ]; then
+  rm -rf "${ENABLED_LIBRARY_PATH}" || return 1
+fi
+
+SCRIPT_PATH="${BASEDIR}/scripts/web/${LIB_NAME}.sh"
+if [ ! -f "${SCRIPT_PATH}" ]; then
+  echo -e "\nERROR: web build script not found for ${LIB_NAME}: ${SCRIPT_PATH}\n"
+  exit 1
+fi
+
+set_toolchain_paths "${LIB_NAME}"
+
+# SET BUILD FLAGS
+HOST=$(get_host)
+export CFLAGS=$(get_cflags "${LIB_NAME}")
+export CXXFLAGS=$(get_cxxflags "${LIB_NAME}")
+export LDFLAGS=$(get_ldflags "${LIB_NAME}")
+export PKG_CONFIG_LIBDIR="$(get_web_pkg_config_libdir)"
+# emconfigure/emcmake reset PKG_CONFIG_LIBDIR to Emscripten's sysroot and take the
+# additive search path from EM_PKG_CONFIG_PATH, so expose our built .pc files there.
+export EM_PKG_CONFIG_PATH="$(get_web_pkg_config_libdir)"
+
+cd "${BASEDIR}"/src/"${LIB_NAME}" || return 1
+
+LIB_INSTALL_PREFIX="${ENABLED_LIBRARY_PATH}"
+BUILD_DIR=$(get_cmake_build_directory)
+
+echo -e "----------------------------------------------------------------"
+echo -e "\nINFO: Building ${LIB_NAME} for ${HOST} with the following environment variables\n"
+env
+echo -e "----------------------------------------------------------------\n"
+echo -e "INFO: System information\n"
+echo -e "INFO: $(uname -a)\n"
+echo -e "----------------------------------------------------------------\n"
+
+rm -rf "${LIB_INSTALL_PREFIX}" || return 1
+rm -rf "${BUILD_DIR}" || return 1
+
+# EXECUTE BUILD SCRIPT OF EACH ENABLED LIBRARY
+source "${SCRIPT_PATH}"
